@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from "vue";
-import { MyTasks, FinishedTasks } from "src/composables/Tasks";
+import { MyTasks, FinishedTasks, DeletedTasks } from "src/composables/Tasks";
 
 let text = ref(null);
 let form = ref(null); // Element ref for q-form
 let selectedTodo = ref(null); // State that stores the current selected row
 let toMarkAsDone = ref(null); // State that stores the row that would be marked as done
+let toDelete = ref(null); // State that stores the row that would be deleted
 
 // addTodo
 // This function pushes an item to the MyTasks list
@@ -42,10 +43,10 @@ const updateTodo = () => {
 // toggleDialog
 // This function toggles the confirmation dialog
 let showDialog = ref(false);
-const toggleDialog = (row) => {
+const toggleDialog = (row, status) => {
   showDialog.value = true;
-  toMarkAsDone.value = null;
-  toMarkAsDone.value = row;
+  toMarkAsDone.value = toDelete.value = null;
+  status !== "delete" ? (toMarkAsDone.value = row) : (toDelete.value = row);
 };
 
 // markAsDone
@@ -57,6 +58,18 @@ const markAsDone = () => {
   index !== -1 && MyTasks.value.splice(index, 1);
   FinishedTasks.value.push(toMarkAsDone.value);
   toMarkAsDone.value = null;
+  showDialog.value = false;
+};
+
+// removeTodo
+// This function looks at toDelete and finds the same id inside the
+// MyTasks list and removes it when found. This then adds it to the
+// DeletedTasks list
+const removeTodo = () => {
+  let index = MyTasks.value.findIndex((t) => t.id === toDelete.value.id);
+  index !== -1 && MyTasks.value.splice(index, 1);
+  DeletedTasks.value.push(toDelete.value);
+  toDelete.value = null;
   showDialog.value = false;
 };
 </script>
@@ -110,12 +123,17 @@ const markAsDone = () => {
             <div class="text-bold q-pl-lg">{{ row.todo }}</div>
             <div class="bg-white q-pa-sm">
               <q-btn
-                @click.stop="toggleDialog(row)"
+                @click.stop="toggleDialog(row, 'mark-done')"
                 flat
                 icon="check_circle_outline"
                 color="green"
               />
-              <q-btn flat icon="delete_outline" color="red" />
+              <q-btn
+                @click.stop="toggleDialog(row, 'delete')"
+                flat
+                icon="delete_outline"
+                color="red"
+              />
             </div>
           </q-card-section>
         </q-card>
@@ -123,17 +141,21 @@ const markAsDone = () => {
         <q-dialog v-model="showDialog" persistent>
           <q-card>
             <q-card-section class="row items-center">
-              <div class="q-ml-sm">
+              <div v-if="toMarkAsDone" class="q-ml-sm">
                 Are you sure you want to mark
                 <span class="text-green">"{{ toMarkAsDone.todo }}"</span> as
                 done?
+              </div>
+              <div v-else class="q-ml-sm">
+                Are you sure you want to delete
+                <span class="text-green">"{{ toDelete.todo }}"</span>?
               </div>
             </q-card-section>
 
             <q-card-actions align="right">
               <q-btn flat label="Cancel" color="primary" v-close-popup />
               <q-btn
-                @click="markAsDone()"
+                @click="toMarkAsDone ? markAsDone() : removeTodo()"
                 flat
                 label="Yes"
                 color="primary"
